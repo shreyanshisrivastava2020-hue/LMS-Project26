@@ -1,159 +1,208 @@
-import { getUserCourses, getUserStreak } from '@/app/actions/course';
-import { syncUserToDatabase } from '@/app/actions/user';
-import Link from 'next/link';
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
+import Link from "next/link";
+import mongoose from "mongoose";
 
-// Helper: format duration
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours === 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
-}
+import connectDB from "@/app/lib/mongodb";
+import UserProgress from "@/models/UserProgress";
+import Course from "@/models/Course";
+import StatCard from "@/app/components/courses/StatCard";
 
-export default async function StudentDashboardPage() {
-  // Mock user (replace with Clerk auth later)
-  const user = {
-    id: 'mock-user-id',
-    firstName: 'Student',
-    lastName: 'Example',
-    email: 'student@example.com',
-  };
+export default async function DashboardPage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
 
-  // 🔹 Sync user to DB
-  await syncUserToDatabase( {
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-  });
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Please login to continue.
+      </div>
+    );
+  }
 
-  // 🔹 Fetch user's courses
-  const coursesResult = await getUserCourses(user.id);
-  const courses = (coursesResult.success && Array.isArray(coursesResult.courses))
-    ? coursesResult.courses
-    : [];
+  let decoded: any;
 
-  // 🔹 Calculate course stats
-  const enrichedCourses = courses.map((course: any) => {
-    let totalMinutes = course.totalDuration || 0;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET!);
+  } catch {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Invalid session. Please login again.
+      </div>
+    );
+  }
 
-    // If no totalDuration, calculate from lessons
-    if (!totalMinutes && course.modules) {
-      let totalSeconds = 0;
-      course.modules.forEach((mod: any) => {
-        mod.lessons?.forEach((lesson: any) => {
-          totalSeconds += lesson.videoDuration || 0;
-        });
-      });
-      totalMinutes = Math.ceil(totalSeconds / 60);
-    }
+  await connectDB();
+
+  // ✅ MATCH YOUR SCHEMA (user + course)
+  const progressData = await UserProgress.find({
+    user: new mongoose.Types.ObjectId(decoded.id),
+  }).lean();
+
+  // ✅ Extract course IDs correctly
+  const courseIds = progressData.map((p: any) => p.course);
+
+  let courses: any[] = [];
+
+  if (courseIds.length > 0) {
+    courses = await Course.find({
+      _id: { $in: courseIds },
+    }).lean();
+  }
+
+  const enrolledCoursesCount = courses.length;
+
+  let completedCoursesCount = 0;
+  let overallProgress = 0;
+
+  const courseProgressData = courses.map((course: any) => {
+    const progress = progressData.find(
+      (p: any) =>
+        p.course.toString() === course._id.toString()
+    );
+
+    const totalLessons = course.totalLessons || 0;
+
+    const completedLessons = Array.isArray(progress?.completedLessons)
+      ? progress.completedLessons.length
+      : 0;
+
+    const percent =
+      totalLessons > 0
+        ? Math.round((completedLessons / totalLessons) * 100)
+        : 0;
+
+    if (percent === 100) completedCoursesCount++;
+
+    overallProgress += percent;
 
     return {
-      id: course._id,
-      title: course.title,
-      slug: course.slug,
-      description: course.description,
-      category: course.category,
-      thumbnail: course.thumbnail || '/images/default-course.jpg',
-      progress: course.progress || 0,
-      totalLessons: course.totalLessons || 0,
-      completedLessonsCount: course.completedLessonsCount || 0,
-      durationMinutes: totalMinutes,
-      durationFormatted: totalMinutes > 0 ? formatDuration(totalMinutes) : '0m',
+      ...course,
+      percent,
     };
   });
 
-  // 🔹 Calculate dashboard stats
-  const activeCourses = enrichedCourses.length;
-  const completedLessons = enrichedCourses.reduce((sum, c) => sum + c.completedLessonsCount, 0);
-  const totalLearningTimeMinutes = enrichedCourses.reduce((sum, c) => sum + c.durationMinutes, 0);
-  const learningTimeFormatted = totalLearningTimeMinutes > 0 ? formatDuration(totalLearningTimeMinutes) : '0h';
+  if (enrolledCoursesCount > 0) {
+    overallProgress = Math.round(
+      overallProgress / enrolledCoursesCount
+    );
+  }
 
-  // 🔹 Fetch user streak
-  const streakResult = await getUserStreak(user.id);
-  const dayStreak = streakResult.success ? streakResult.streak : 0;
+  const continueLearning = courseProgressData
+    .filter((c) => c.percent < 100)
+    .sort((a, b) => b.percent - a.percent)[0];
 
-  // 🔹 Recent activity
-  const recentActivity = enrichedCourses
-    .filter(c => c.progress > 0)
-    .sort((a, b) => b.progress - a.progress)
-    .slice(0, 4)
-    .map(c => {
-      if (c.progress === 100) return { type: 'completed', title: `Completed "${c.title}"` };
-      if (c.progress > 50) return { type: 'milestone', title: `${c.progress}% complete in "${c.title}"` };
-      if (c.progress > 0) return { type: 'started', title: `Started "${c.title}"` };
-      return { type: 'started', title: `Enrolled in "${c.title}"` };
-    });
-
-  // 🔹 Render UI
   return (
-    <div className="min-h-full gradient-bg-page">
-      <div className="max-w-7xl mx-auto p-6 lg:p-8 space-y-8">
-        {/* Welcome */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-              Welcome back, {user.firstName}! 👋
-            </h1>
-            <p className="text-base text-gray-600">
-              Continue your learning journey and achieve your goals
-            </p>
-          </div>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <div className="max-w-7xl mx-auto px-6 py-10">
+
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Dashboard
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Welcome back, {decoded.username}. Here’s your learning overview.
+          </p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Active Courses */}
-          <div className="relative overflow-hidden gradient-stat-blue rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">📚</div>
-                <span className="text-2xl font-bold">{activeCourses}</span>
-              </div>
-              <p className="text-sm font-medium text-blue-100">Active Courses</p>
-            </div>
-          </div>
-
-          {/* Lessons Complete */}
-          <div className="relative overflow-hidden gradient-stat-purple rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">✓</div>
-                <span className="text-2xl font-bold">{completedLessons}</span>
-              </div>
-              <p className="text-sm font-medium text-purple-100">Lessons Complete</p>
-            </div>
-          </div>
-
-          {/* Total Learning Time */}
-          <div className="relative overflow-hidden gradient-stat-amber rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">⏱️</div>
-                <span className="text-2xl font-bold">{learningTimeFormatted}</span>
-              </div>
-              <p className="text-sm font-medium text-amber-100">Total Content</p>
-            </div>
-          </div>
-
-          {/* Day Streak */}
-          <div className="relative overflow-hidden gradient-stat-emerald rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">🔥</div>
-                <span className="text-2xl font-bold">{dayStreak}</span>
-              </div>
-              <p className="text-sm font-medium text-emerald-100">Day Streak</p>
-            </div>
-          </div>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
+          <StatCard
+            title="Enrolled Courses"
+            value={enrolledCoursesCount.toString()}
+          />
+          <StatCard
+            title="Completed Courses"
+            value={completedCoursesCount.toString()}
+          />
+          <StatCard
+            title="Overall Progress"
+            value={`${overallProgress}%`}
+          />
         </div>
 
-        {/* Continue Learning / Recent Activity */}
-        {/* You can map enrichedCourses or recentActivity here */}
+        {/* Continue Learning */}
+        {continueLearning && (
+          <section className="mb-14">
+            <h2 className="text-xl font-semibold mb-4">
+              Continue Learning
+            </h2>
+
+            <div className="border rounded-xl p-6 bg-white shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div>
+                <h3 className="text-lg font-medium">
+                  {continueLearning.title}
+                </h3>
+
+                <div className="mt-3 w-full md:w-72 bg-gray-200 h-2 rounded-full">
+                  <div
+                    className="bg-black h-2 rounded-full"
+                    style={{ width: `${continueLearning.percent}%` }}
+                  />
+                </div>
+
+                <p className="text-sm text-gray-500 mt-2">
+                  {continueLearning.percent}% completed
+                </p>
+              </div>
+
+              <Link
+                href={`/course/${continueLearning._id}`}
+                className="inline-block bg-black text-white px-5 py-2 rounded-lg text-sm hover:opacity-90 transition"
+              >
+                Resume Course
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {/* My Courses */}
+        <section>
+          <h2 className="text-xl font-semibold mb-6">
+            My Courses
+          </h2>
+
+          {courseProgressData.length === 0 ? (
+            <div className="border rounded-xl p-8 text-center bg-white shadow-sm">
+              <p className="text-gray-500">
+                You are not enrolled in any courses yet.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {courseProgressData.map((course: any) => (
+                <div
+                  key={course._id}
+                  className="border rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition"
+                >
+                  <h3 className="text-lg font-medium mb-4">
+                    {course.title}
+                  </h3>
+
+                  <div className="w-full bg-gray-200 h-2 rounded-full mb-3">
+                    <div
+                      className="bg-black h-2 rounded-full"
+                      style={{ width: `${course.percent}%` }}
+                    />
+                  </div>
+
+                  <p className="text-sm text-gray-500 mb-4">
+                    {course.percent}% completed
+                  </p>
+
+                  <Link
+                    href={`/course/${course._id}`}
+                    className="text-sm font-medium text-black hover:underline"
+                  >
+                    View Course →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
       </div>
     </div>
   );

@@ -1,244 +1,167 @@
-import { url } from 'inspector';
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import { Schema, model, models, Document, Types } from "mongoose";
 
-// Lesson interface
-export interface ILesson {
-  _id?: string;
-  title: string;
-  description?: string;
-  videoUrl?: string;
-  videoDuration?: number; // in seconds
-  order: number;
-  isFree?: boolean;
-  resources?: {
-    title: string;
-    url: string;
-    type: 'pdf' | 'doc' | 'video' | 'link' | 'other';
-  }[];
+/* ================= ENUMS ================= */
+
+export enum CourseLevel {
+  BEGINNER = "beginner",
+  INTERMEDIATE = "intermediate",
+  ADVANCED = "advanced",
 }
 
-// Module/Section interface
-export interface IModule {
-  _id?: string;
-  title: string;
-  description?: string;
-  order: number;
-  lessons: ILesson[];
+export enum CourseStatus {
+  DRAFT = "draft",
+  PUBLISHED = "published",
+  ARCHIVED = "archived",
 }
 
-// Course interface
+/* ================= INTERFACE ================= */
+
 export interface ICourse extends Document {
   title: string;
-  slug: string;
+  slug?: string;
   description: string;
   shortDescription?: string;
-  
-  // Content
-  modules: IModule[];
-  
-  // Media
-  thumbnail?:  string | null;
-  
-  // Instructor
-  instructor?: mongoose.Schema.Types.ObjectId;
-  
-  // Metadata
+
+  instructor?: Types.ObjectId; // ✅ must match API
+
   category: string;
   tags?: string[];
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+
+  level: CourseLevel;
   language: string;
-  
-  // Duration & Stats
-  totalDuration?: number; // in minutes
-  totalLessons?: number;
-  enrolledCount: number;
-  completedCount: number;
-  
-  // Rating
-  rating?: number;
-  ratingCount?: number;
-  
-  // Pricing
-  price?: number;
-  currency?: string;
-  isFree: boolean;
-  
-  // Status
+
+  price: number;
+  thumbnail?: string;
+  previewVideo?: string;
+
+  modules: Types.ObjectId[];
+
+  totalDuration: number;
+  totalLessons: number;
+
+  studentsEnrolled: Types.ObjectId[];
+
+  averageRating: number;
+  totalReviews: number;
+
+  status: CourseStatus;
   isPublished: boolean;
-  isFeatured: boolean;
-  
-  // SEO
-  metaTitle?: string;
-  metaDescription?: string;
-  
-  // Learning Outcomes
-  learningOutcomes?: string[];
-  requirements?: string[];
-  
-  // Timestamps
+
   createdAt: Date;
   updatedAt: Date;
-  publishedAt?: Date;
-  
-  // Methods
-  calculateTotalDuration(): void;
 }
 
-const LessonSchema = new Schema({
-  title: {
-    type: String,
-    required: true,
-  },
-  description: {
-    type: String,
-  },
-  videoUrl: {
-    type: String,
-  },
-  videoDuration: {
-    type: Number, // in seconds
-  },
-  order: {
-    type: Number,
-    required: true,
-  },
-  isFree: {
-    type: Boolean,
-    default: false,
-  },
-  resources: [{
-    title: String,
-    url: String,
-    type: {
-      type: String,
-      enum: ['pdf', 'doc', 'video', 'link', 'other'],
-    },
-  }],
-});
+/* ================= SCHEMA ================= */
 
-const ModuleSchema = new Schema({
-  title: {
-    type: String,
-    required: true,
-  },
-  description: {
-    type: String,
-  },
-  order: {
-    type: Number,
-    required: true,
-  },
-  lessons: [LessonSchema],
-});
-
-const CourseSchema: Schema<ICourse> = new Schema(
+const CourseSchema = new Schema<ICourse>(
   {
     title: {
       type: String,
       required: true,
       trim: true,
     },
+
     slug: {
       type: String,
       required: true,
       unique: true,
-      index: true,
-      lowercase: true,
+      trim: true,
     },
+
     description: {
       type: String,
       required: true,
     },
+
     shortDescription: {
       type: String,
     },
-   
-    modules: [ModuleSchema],
-    // Allow legacy string or new object structure
-    thumbnail: {
-      type: String,
-    },
+
+    // ✅ IMPORTANT: must match API (instructor, not teacher)
     instructor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
 
     category: {
       type: String,
       required: true,
-      index: true,
     },
-    tags: [{
+
+    tags: [
+      {
+        type: String,
+      },
+    ],
+
+    level: {
       type: String,
-    }],
-    difficulty: {
-      type: String,
-      enum: ['beginner', 'intermediate', 'advanced'],
-      default: 'beginner',
+      enum: Object.values(CourseLevel),
+      default: CourseLevel.BEGINNER,
     },
+
     language: {
       type: String,
-      default: 'en',
+      default: "English",
     },
-    totalDuration: {
-      type: Number, // in minutes
-    },
-    totalLessons: {
-      type: Number,
-    },
-    enrolledCount: {
-      type: Number,
-      default: 0,
-    },
-    completedCount: {
-      type: Number,
-      default: 0,
-    },
-    rating: {
-      type: Number,
-      min: 0,
-      max: 5,
-    },
-    ratingCount: {
-      type: Number,
-      default: 0,
-    },
+
     price: {
       type: Number,
-      min: 0,
+      default: 0,
     },
-    currency: {
+
+    thumbnail: {
       type: String,
-      default: 'USD',
     },
-    isFree: {
-      type: Boolean,
-      default: false,
+
+    previewVideo: {
+      type: String,
     },
+
+    modules: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Module",
+      },
+    ],
+
+    totalDuration: {
+      type: Number,
+      default: 0,
+    },
+
+    totalLessons: {
+      type: Number,
+      default: 0,
+    },
+
+    studentsEnrolled: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    averageRating: {
+      type: Number,
+      default: 0,
+    },
+
+    totalReviews: {
+      type: Number,
+      default: 0,
+    },
+
+    status: {
+      type: String,
+      enum: Object.values(CourseStatus),
+      default: CourseStatus.DRAFT,
+    },
+
     isPublished: {
       type: Boolean,
       default: false,
-      index: true,
-    },
-    isFeatured: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    metaTitle: {
-      type: String,
-    },
-    metaDescription: {
-      type: String,
-    },
-    learningOutcomes: [{
-      type: String,
-    }],
-    requirements: [{
-      type: String,
-    }],
-    publishedAt: {
-      type: Date,
     },
   },
   {
@@ -246,46 +169,13 @@ const CourseSchema: Schema<ICourse> = new Schema(
   }
 );
 
-// Indexes for better query performance
-CourseSchema.index({ category: 1, isPublished: 1 });
-CourseSchema.index({ isFeatured: 1, isPublished: 1 });
-CourseSchema.index({ createdAt: -1 });
+/* ================= INDEXES ================= */
 
-// Virtual for calculating completion rate
-CourseSchema.virtual('completionRate').get(function() {
-  if (this.enrolledCount === 0) return 0;
-  return (this.completedCount / this.enrolledCount) * 100;
-});
+CourseSchema.index({ title: "text", description: "text" });
+CourseSchema.index({ slug: 1 });
+CourseSchema.index({ instructor: 1 });
 
-// Method to calculate total duration from modules
-CourseSchema.methods.calculateTotalDuration = function() {
-  let totalSeconds = 0;
-  let lessonCount = 0;
-  
-  this.modules.forEach((module: IModule) => {
-    module.lessons.forEach((lesson: ILesson) => {
-      if (lesson.videoDuration) {
-        totalSeconds += lesson.videoDuration;
-      }
-      lessonCount++;
-    });
-  });
-  
-  this.totalDuration = Math.ceil(totalSeconds / 60); // Convert to minutes
-  this.totalLessons = lessonCount;
-};
+/* ================= EXPORT ================= */
 
-// Pre-save hook to update totals
-CourseSchema.pre('save', function(next) {
-  if (this.isModified('modules')) {
-    this.calculateTotalDuration();
-  }
- // next();
-});
-
-// Prevent model overwrite upon initial compile
-const Course: Model<ICourse> =
-  mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);
-
-export default Course;
-
+export default models.Course ||
+  model<ICourse>("Course", CourseSchema);

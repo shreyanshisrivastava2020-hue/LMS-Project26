@@ -1,194 +1,160 @@
 'use server';
 
 import connectDB from '@/app/lib/auth/mongodb';
-import Course from '@/models/Course';
-import UserProgress from '@/models/UserProgress';
+import { Course, CourseStatus } from '@/models/Course';
+import { Types } from 'mongoose';
+import slugify from 'slugify';
 
-/* ===================== HELPERS ===================== */
-
-function normalizeId(doc: any) {
-  if (!doc) return doc;
-  return {
-    ...doc,
-    _id: doc._id.toString(),
-  };
-}
-
-function normalizeCourse(course: any) {
-  return {
-    ...course,
-    _id: course._id.toString(),
-    modules: course.modules?.map((module: any) => ({
-      ...module,
-      _id: module._id.toString(),
-      lessons: module.lessons?.map((lesson: any) => ({
-        ...lesson,
-        _id: lesson._id.toString(),
-      })),
-    })) ?? [],
-  };
-}
-
-/* ===================== CREATE COURSE ===================== */
-
-export async function createCourse(data: {
+/* =====================================================
+   CREATE COURSE
+===================================================== */
+export async function createCourseAction({
+  title,
+  description,
+  category,
+  price,
+  level,
+  userId,
+}: {
   title: string;
-  description?: string;
-  slug: string;
+  description: string;
+  category: string;
   price?: number;
-  thumbnail?: string;
+  level?: string;
+  userId: string;
 }) {
   try {
     await connectDB();
 
+    const slug = slugify(title, { lower: true, strict: true });
+
+    const existing = await Course.findOne({ slug });
+    if (existing) {
+      return { success: false, error: 'Course already exists' };
+    }
+
     const course = await Course.create({
-      title: data.title,
-      description: data.description,
-      slug: data.slug,
-      price: data.price ?? 0,
-      thumbnail: data.thumbnail ?? null,
+      title,
+      slug,
+      description,
+      category,
+      price: price ?? 0,
+      level,
+      instructor: new Types.ObjectId(userId), // ✅ FIXED
+      status: CourseStatus.DRAFT,
+      isPublished: false,
     });
 
     return {
       success: true,
-      course: normalizeCourse(course.toObject()),
+      courseId: course._id.toString(),
     };
   } catch (error) {
-    console.error('Create course error:', error);
-    return { success: false, error: 'Failed to create course' };
+    console.error('Create error:', error);
+    return { success: false };
   }
 }
 
-/* ===================== GET ALL COURSES ===================== */
-
-export async function getAllCourses() {
+/* =====================================================
+   UPDATE COURSE
+===================================================== */
+export async function updateCourseAction(
+  courseId: string,
+  userId: string,
+  updates: any
+) {
   try {
     await connectDB();
 
-    const courses = await Course.find({ isPublished: true })
-      .select('_id title slug description category difficulty thumbnail')
-      .lean();
+    const course = await Course.findById(courseId);
+    if (!course) return { success: false };
 
-    return {
-      success: true,
-      courses,
-    };
+    // ✅ check instructor instead of createdBy
+    if (course.instructor.toString() !== userId) {
+      return { success: false, error: 'Not authorized' };
+    }
+
+    if (updates.title) {
+      course.title = updates.title;
+      course.slug = slugify(updates.title, { lower: true, strict: true });
+    }
+
+    if (updates.description !== undefined)
+      course.description = updates.description;
+
+    if (updates.category !== undefined)
+      course.category = updates.category;
+
+    if (updates.price !== undefined)
+      course.price = updates.price;
+
+    if (updates.level !== undefined)
+      course.level = updates.level;
+
+    await course.save();
+
+    return { success: true };
   } catch (error) {
-    console.error('Failed to fetch courses:', error);
-    return { success: false, courses: [] };
+    console.error(error);
+    return { success: false };
   }
 }
 
-/* ===================== GET COURSE BY SLUG ===================== */
-
-export async function getCourseBySlug(slug: string) {
+/* =====================================================
+   PUBLISH COURSE
+===================================================== */
+export async function publishCourseAction(
+  courseId: string,
+  userId: string
+) {
   try {
     await connectDB();
 
-    const course = await Course.findOne({ slug }).lean();
-    if (!course) return { success: false, error: 'Course not found' };
+    const course = await Course.findById(courseId);
+    if (!course) return { success: false };
 
-    return { success: true, course: normalizeCourse(course) };
+    if (course.instructor.toString() !== userId) {
+      return { success: false, error: 'Not authorized' };
+    }
+
+    if (!course.modules || course.modules.length === 0) {
+      return { success: false, error: 'Add module before publishing' };
+    }
+
+    course.status = CourseStatus.PUBLISHED;
+    course.isPublished = true;
+
+    await course.save();
+
+    return { success: true };
   } catch (error) {
-    console.error('getCourseBySlug error:', error);
-    return { success: false, error: 'Failed to fetch course' };
+    console.error(error);
+    return { success: false };
   }
 }
 
-/* ===================== ENROLL IN COURSE ===================== */
-
-export async function enrollInCourse(userId: string, courseId: string) {
+/* =====================================================
+   DELETE COURSE
+===================================================== */
+export async function deleteCourseAction(
+  courseId: string,
+  userId: string
+) {
   try {
     await connectDB();
 
-    const existing = await UserProgress.findOne({ userId, courseId });
-    if (existing) return { success: false, error: 'Already enrolled' };
+    const course = await Course.findById(courseId);
+    if (!course) return { success: false };
 
-    const progress = await UserProgress.create({
-      userId,
-      courseId,
-      modules: [],
-      overallProgress: 0,
-      isCompleted: false,
-      totalTimeSpent: 0,
-      certificateIssued: false,
-      enrolledAt: new Date(),
-      lastAccessedAt: new Date(),
-    });
+    if (course.instructor.toString() !== userId) {
+      return { success: false, error: 'Not authorized' };
+    }
 
-    return { success: true, progress: normalizeId(progress.toObject()) };
+    await course.deleteOne();
+
+    return { success: true };
   } catch (error) {
-    console.error('enrollInCourse error:', error);
-    return { success: false, error: 'Enrollment failed' };
-  }
-}
-
-/* ===================== GET USER COURSES WITH PROGRESS ===================== */
-
-export async function getUserCourses(userId: string) {
-  try {
-    await connectDB();
-
-    const progressList = await UserProgress.find({ userId }).lean();
-    const courseIds = progressList.map(p => p.courseId.toString());
-
-    const courses = await Course.find({ _id: { $in: courseIds } }).lean();
-
-    const merged = courses.map(course => {
-      const progress = progressList.find(
-        p => p.courseId.toString() === course._id.toString()
-      );
-
-      const completedLessonsCount =
-        progress?.modules?.reduce(
-          (acc, m) => acc + (m.lessons?.filter(l => l.completed)?.length ?? 0),
-          0
-        ) ?? 0;
-
-      const totalLessons =
-        progress?.modules?.reduce(
-          (acc, m) => acc + (m.lessons?.length ?? 0),
-          0
-        ) ?? 0;
-
-      return {
-        ...normalizeCourse(course),
-        progress: progress?.overallProgress ?? 0,
-        completedLessonsCount,
-        totalLessons,
-      };
-    });
-
-    return { success: true, courses: merged };
-  } catch (error) {
-    console.error('getUserCourses error:', error);
-    return { success: false, courses: [] };
-  }
-}
-
-/* ===================== GET USER STREAK ===================== */
-
-export async function getUserStreak(userId: string) {
-  try {
-    await connectDB();
-
-    const progresses = await UserProgress.find({ userId }).lean();
-    const today = new Date();
-    let streak = 0;
-
-    progresses.forEach(p => {
-      if (p.lastAccessedAt) {
-        const diffDays = Math.floor(
-          (today.getTime() - new Date(p.lastAccessedAt).getTime()) /
-            (1000 * 60 * 60 * 24)
-        );
-        if (diffDays === 0) streak += 1;
-      }
-    });
-
-    return { success: true, streak };
-  } catch (error) {
-    console.error('getUserStreak error:', error);
-    return { success: false, streak: 0 };
+    console.error(error);
+    return { success: false };
   }
 }
