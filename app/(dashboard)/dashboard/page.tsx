@@ -34,12 +34,10 @@ export default async function DashboardPage() {
 
   await connectDB();
 
-  // ✅ MATCH YOUR SCHEMA (user + course)
   const progressData = await UserProgress.find({
     user: new mongoose.Types.ObjectId(decoded.id),
   }).lean();
 
-  // ✅ Extract course IDs correctly
   const courseIds = progressData.map((p: any) => p.course);
 
   let courses: any[] = [];
@@ -57,8 +55,7 @@ export default async function DashboardPage() {
 
   const courseProgressData = courses.map((course: any) => {
     const progress = progressData.find(
-      (p: any) =>
-        p.course.toString() === course._id.toString()
+      (p: any) => p.course.toString() === course._id.toString()
     );
 
     const totalLessons = course.totalLessons || 0;
@@ -98,11 +95,12 @@ export default async function DashboardPage() {
 
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Dashboard
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome,{" "}
+            <span className="text-blue-600">{decoded.username}</span> 👋
           </h1>
           <p className="text-gray-500 mt-2">
-            Welcome back, {decoded.username}. Here’s your learning overview.
+            Here’s your learning overview.
           </p>
         </div>
 
@@ -111,97 +109,82 @@ export default async function DashboardPage() {
           <StatCard
             title="Enrolled Courses"
             value={enrolledCoursesCount.toString()}
+            bgColor="bg-blue-100"
+            textColor="text-blue-600"
           />
           <StatCard
             title="Completed Courses"
             value={completedCoursesCount.toString()}
+            bgColor="bg-green-100"
+            textColor="text-green-600"
           />
           <StatCard
             title="Overall Progress"
             value={`${overallProgress}%`}
+            bgColor="bg-purple-100"
+            textColor="text-purple-600"
           />
         </div>
 
-        {/* Continue Learning */}
-        {continueLearning && (
-          <section className="mb-14">
-            <h2 className="text-xl font-semibold mb-4">
+        {/* Continue Learning Section */}
+        {continueLearning ? (
+          <section>
+            <h2 className="text-xl font-semibold mb-6">
               Continue Learning
             </h2>
 
-            <div className="border rounded-xl p-6 bg-white shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div>
-                <h3 className="text-lg font-medium">
-                  {continueLearning.title}
-                </h3>
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden md:flex">
 
-                <div className="mt-3 w-full md:w-72 bg-gray-200 h-2 rounded-full">
-                  <div
-                    className="bg-black h-2 rounded-full"
-                    style={{ width: `${continueLearning.percent}%` }}
-                  />
-                </div>
-
-                <p className="text-sm text-gray-500 mt-2">
-                  {continueLearning.percent}% completed
-                </p>
+              {/* Thumbnail */}
+              <div className="md:w-1/3 h-64 bg-gray-200">
+                <img
+                  src={
+                    continueLearning.image ||
+                    "https://via.placeholder.com/600x400?text=Course+Thumbnail"
+                  }
+                  alt={continueLearning.title}
+                  className="w-full h-full object-cover"
+                />
               </div>
 
-              <Link
-                href={`/course/${continueLearning._id}`}
-                className="inline-block bg-black text-white px-5 py-2 rounded-lg text-sm hover:opacity-90 transition"
-              >
-                Resume Course
-              </Link>
-            </div>
-          </section>
-        )}
-
-        {/* My Courses */}
-        <section>
-          <h2 className="text-xl font-semibold mb-6">
-            My Courses
-          </h2>
-
-          {courseProgressData.length === 0 ? (
-            <div className="border rounded-xl p-8 text-center bg-white shadow-sm">
-              <p className="text-gray-500">
-                You are not enrolled in any courses yet.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {courseProgressData.map((course: any) => (
-                <div
-                  key={course._id}
-                  className="border rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition"
-                >
-                  <h3 className="text-lg font-medium mb-4">
-                    {course.title}
+              {/* Content */}
+              <div className="p-10 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-2xl font-semibold mb-4">
+                    {continueLearning.title}
                   </h3>
 
-                  <div className="w-full bg-gray-200 h-2 rounded-full mb-3">
+                  <div className="w-full bg-gray-200 h-3 rounded-full mb-4">
                     <div
-                      className="bg-black h-2 rounded-full"
-                      style={{ width: `${course.percent}%` }}
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${continueLearning.percent}%`,
+                      }}
                     />
                   </div>
 
-                  <p className="text-sm text-gray-500 mb-4">
-                    {course.percent}% completed
+                  <p className="text-gray-600">
+                    {continueLearning.percent}% completed
                   </p>
-
-                  <Link
-                    href={`/course/${course._id}`}
-                    className="text-sm font-medium text-black hover:underline"
-                  >
-                    View Course →
-                  </Link>
                 </div>
-              ))}
+
+                <Link
+                  href={`/course/${continueLearning._id}`}
+                  className="mt-6 inline-block bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:opacity-90 transition"
+                >
+                  Resume Course
+                </Link>
+              </div>
+
             </div>
-          )}
-        </section>
+          </section>
+        ) : (
+          <div className="bg-white p-10 rounded-xl text-center shadow-sm">
+            <p className="text-gray-500">
+              You are not enrolled in any courses yet.
+            </p>
+          </div>
+        )}
 
       </div>
     </div>

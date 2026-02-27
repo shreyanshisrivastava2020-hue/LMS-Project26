@@ -1,13 +1,22 @@
-interface StatCardProps {
+type Props = {
   title: string;
   value: string;
-}
+  bgColor?: string;
+  textColor?: string;
+};
 
-export default function StatCard({ title, value }: StatCardProps) {
+export default function StatCard({
+  title,
+  value,
+  bgColor = "bg-gray-100",
+  textColor = "text-black",
+}: Props) {
   return (
-    <div className="bg-white shadow-md rounded-xl p-6 text-center">
-      <h3 className="text-gray-500 text-sm mb-2">{title}</h3>
-      <p className="text-3xl font-bold text-blue-600">{value}</p>
+    <div className={`${bgColor} p-6 rounded-xl shadow-sm`}>
+      <p className="text-sm text-gray-500">{title}</p>
+      <h3 className={`text-2xl font-bold mt-2 ${textColor}`}>
+        {value}
+      </h3>
     </div>
   );
 }
