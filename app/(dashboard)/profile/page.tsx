@@ -1,247 +1,145 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
-import { Upload, Pencil, Save } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { BookOpen, Award, Clock, TrendingUp } from "lucide-react";
 
-type UserType = {
-  name: string;
-  email: string;
-  role: string;
-  contact: string;
-  avatarUrl: string;
-  bio: string;
-};
-
-export default function ProfilePage() {
-  const router = useRouter();
-  const avatarRef = useRef<HTMLInputElement | null>(null);
-
-  const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
-
-  // Initialize with empty values (IMPORTANT FIX)
-  const [user, setUser] = useState<UserType>({
-    name: "",
-    email: "",
-    role: "",
-    contact: "",
-    avatarUrl: "",
-    bio: "",
-  });
-
-
-  // Fetch Logged In User
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await fetch("/api/profile", {
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          router.push("/login");
-          return;
-        }
-
-        const data = await res.json();
-
-        setUser({
-          name: data.name || "",
-          email: data.email || "",
-          role: data.role || "",
-          contact: data.contact || "",
-          avatarUrl: data.avatarUrl || "",
-          bio: data.bio || "",
-        });
-      } catch (error) {
-        router.push("/login");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [router]);
-
-
-  // Save Updated Profile
-
-  const handleSave = async () => {
-    try {
-      const res = await fetch("/api/profile/update", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: user.name,
-          contact: user.contact,
-          bio: user.bio,
-        }),
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        setUser(updated);
-        setEditMode(false);
-      }
-    } catch (error) {
-      console.log("Update failed");
-    }
-  };
-
- 
-  const handleAvatarUpload = (file: File) => {
-    const preview = URL.createObjectURL(file);
-    setUser((prev) => ({
-      ...prev,
-      avatarUrl: preview,
-    }));
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading profile...
-      </div>
-    );
-  }
-
+export default function UserProfile() {
   return (
-    <div className="min-h-screen bg-gray-100 p-6 md:p-10">
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-md p-8">
-        
-        {/* Header */}
-        <div className="flex justify-between items-start mb-8">
-          <h1 className="text-2xl font-bold">Profile</h1>
-
-          {editMode ? (
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-            >
-              <Save size={16} /> Save
-            </button>
-          ) : (
-            <button
-              onClick={() => setEditMode(true)}
-              className="flex items-center gap-2 border px-4 py-2 rounded-lg hover:bg-gray-50"
-            >
-              <Pencil size={16} /> Edit
-            </button>
-          )}
+    <div className="space-y-6">
+      {/* 🔹 HEADER */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">My Profile</h1>
+          <p className="text-sm text-gray-500">
+            Manage your learning and personal details
+          </p>
         </div>
+        <Button size="sm">Edit Profile</Button>
+      </div>
 
-        <div className="flex flex-col md:flex-row gap-8 items-start">
-
-          {/* Avatar Section */}
-          <div className="relative group">
-            <div className="h-32 w-32 rounded-full overflow-hidden border">
-              <Image
-                src={user.avatarUrl || "/images/avatar.jpg"}
-                alt="avatar"
-                width={128}
-                height={128}
-                className="object-cover"
-              />
+      {/* 🔹 TOP GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 👤 PROFILE CARD */}
+        <Card className="rounded-2xl border shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center font-semibold">
+              JD
             </div>
 
-            {editMode && (
-              <>
-                <button
-                  onClick={() => avatarRef.current?.click()}
-                  className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 rounded-full flex items-center justify-center transition"
-                >
-                  <Upload size={20} />
-                </button>
-
-                <input
-                  ref={avatarRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) =>
-                    e.target.files &&
-                    handleAvatarUpload(e.target.files[0])
-                  }
-                />
-              </>
-            )}
-          </div>
-
-          {/* Info Section */}
-          <div className="flex-1 space-y-6">
-
-            {/* Name */}
             <div>
-              <label className="text-sm text-gray-500">Full Name</label>
-              {editMode ? (
-                <input
-                  value={user.name}
-                  onChange={(e) =>
-                    setUser({ ...user, name: e.target.value })
-                  }
-                  className="w-full border rounded-lg px-3 py-2 mt-1"
-                />
-              ) : (
-                <p className="font-semibold text-lg">{user.name}</p>
-              )}
+              <h2 className="font-medium">John Doe</h2>
+              <p className="text-sm text-gray-500">john@email.com</p>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Email */}
-            <div>
-              <label className="text-sm text-gray-500">Email</label>
-              <p className="font-medium">{user.email}</p>
-            </div>
-
-            {/* Contact */}
-            <div>
-              <label className="text-sm text-gray-500">Contact</label>
-              {editMode ? (
-                <input
-                  value={user.contact}
-                  onChange={(e) =>
-                    setUser({ ...user, contact: e.target.value })
-                  }
-                  className="w-full border rounded-lg px-3 py-2 mt-1"
-                />
-              ) : (
-                <p>{user.contact || "Not added"}</p>
-              )}
-            </div>
-
-            {/* Role */}
-            <div>
-              <label className="text-sm text-gray-500">Role</label>
-              <p className="inline-block bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-sm">
-                {user.role}
-              </p>
-            </div>
-
-            {/* Bio */}
-            <div>
-              <label className="text-sm text-gray-500">Bio</label>
-              {editMode ? (
-                <textarea
-                  value={user.bio}
-                  onChange={(e) =>
-                    setUser({ ...user, bio: e.target.value })
-                  }
-                  rows={4}
-                  className="w-full border rounded-lg px-3 py-2 mt-1"
-                />
-              ) : (
-                <p className="text-gray-600">
-                  {user.bio || "No bio added yet."}
-                </p>
-              )}
-            </div>
-
-          </div>
+        {/* 📊 STATS */}
+        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Courses", value: 12, icon: BookOpen },
+            { label: "Completed", value: 5, icon: Award },
+            { label: "Hours", value: "48h", icon: Clock },
+            { label: "Progress", value: "72%", icon: TrendingUp },
+          ].map((item, i) => {
+            const Icon = item.icon;
+            return (
+              <Card
+                key={i}
+                className="rounded-xl border hover:shadow-sm transition"
+              >
+                <CardContent className="p-4 flex items-center gap-3">
+                  <Icon className="w-4 h-4 text-gray-500" />
+                  <div>
+                    <p className="text-xs text-gray-500">{item.label}</p>
+                    <h3 className="text-sm font-semibold">{item.value}</h3>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
+
+      {/* 🔹 MAIN CONTENT */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 📚 COURSES */}
+        <Card className="rounded-2xl border shadow-sm lg:col-span-2">
+          <CardContent className="p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-600">
+              Enrolled Courses
+            </h2>
+
+            {["React Bootcamp", "Node Mastery", "AI Basics"].map(
+              (course, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50"
+                >
+                  <span className="text-sm">{course}</span>
+                  <span className="text-xs text-gray-500">In Progress</span>
+                </div>
+              ),
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 🏆 CERTIFICATES */}
+        <Card className="rounded-2xl border shadow-sm">
+          <CardContent className="p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-600">
+              Certificates
+            </h2>
+
+            <div className="text-sm text-gray-500">2 Certificates earned</div>
+
+            <Button size="sm" variant="outline">
+              View Certificates
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 🔹 ACTIVITY */}
+      <Card className="rounded-2xl border shadow-sm">
+        <CardContent className="p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-gray-600">
+            Recent Activity
+          </h2>
+
+          {[
+            "Completed React Basics",
+            "Started Node.js Course",
+            "Earned Certificate",
+          ].map((item, i) => (
+            <div
+              key={i}
+              className="text-sm text-gray-600 border-b pb-2 last:border-none"
+            >
+              {item}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* 🔹 COMPACT PERSONAL INFO */}
+      <Card className="rounded-2xl border shadow-sm">
+        <CardContent className="p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-600">Personal Info</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input placeholder="First Name" defaultValue="John" />
+            <Input placeholder="Last Name" defaultValue="Doe" />
+            <Input placeholder="Phone" defaultValue="+91 9876543210" />
+          </div>
+
+          <div className="flex justify-end">
+            <Button size="sm">Update</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

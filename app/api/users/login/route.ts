@@ -1,80 +1,57 @@
 import { connect } from "@/dbConfig/dbConfig";
-import User from "@/models/User";
-import { NextRequest, NextResponse } from "next/server";
+import User from "@/models/users";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
-
+connect();
 export async function POST(request: NextRequest) {
   try {
-    await connect();
-
-    const { email, password } = await request.json();
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
-    }
-
-    // ✅ Find user
+    const reqBody = await request.json();
+    const { email, password, role } = reqBody;
+    //validation
+    console.log(reqBody);
     const user = await User.findOne({ email });
-
     if (!user) {
       return NextResponse.json(
-        { error: "User does not exist" },
-        { status: 400 }
+        { error: "User does not exists" },
+        { status: 400 },
       );
     }
 
-    // ✅ Validate password
-    const validPassword = await bcryptjs.compare(
-      password,
-      user.password
-    );
-
+    if (user.role !== role) {
+      return NextResponse.json(
+        { message: "Invalid User credentials" },
+        { status: 404 },
+      );
+    }
+    const validPassword = await bcryptjs.compare(password, user.password);
     if (!validPassword) {
       return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 400 }
+        { error: "Check your Credentials" },
+        { status: 400 },
       );
     }
 
-    // ✅ Create JWT (FIXED - username added)
-    const token = jwt.sign(
-      {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        username: user.username, // 🔥 IMPORTANT FIX
-      },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "1d" }
-    );
-
-    // ✅ Create response
-    const response = NextResponse.json({
-      message: "Login successful",
-      success: true,
+    const tokenData = {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    };
+    const token = jwt.sign(tokenData, process.env.TOKEN_SECRET!, {
+      expiresIn: "1d",
     });
-
-    // ✅ Set cookie properly
+    const response = NextResponse.json({
+      message: "Logged in Success",
+      success: true,
+      user,
+    });
     response.cookies.set("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24, // 1 day
     });
-
     return response;
-
   } catch (error: any) {
-    console.error("Login Error:", error);
-
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

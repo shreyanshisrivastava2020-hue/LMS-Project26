@@ -1,217 +1,187 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import { BookOpen, Clock, BarChart3, User, Star } from "lucide-react";
+import Link from "next/link";
+import { ReactElement, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
-interface Course {
-  _id: string;
+type Course = {
+  _id: number;
   title: string;
-  instructor: string;
-  category: string;
+  description: string;
   level: "Beginner" | "Intermediate" | "Advanced";
-  price: number;
-  image?: string;
-  lessons?: {
-    title: string;
-    videoUrl: string;
-    pdfUrl: string;
-  }[];
-}
+  duration: string;
+  rating: number;
+  enrolledStudents: [];
+  category: string;
+};
 
-export default function CourseDashboard() {
+export default function Page() {
+  const [courses, setCourses] = useState<Course[]>([]);
   const router = useRouter();
 
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const filter = {
+    level: "",
+    category: "",
+  };
 
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("Category");
-  const [level, setLevel] = useState("Sort by level");
-  const [sortBy, setSortBy] = useState("az");
+  //TODO : Implement filtering and searching
+  const handleChange = () => {};
 
-  const [enrolledCourses, setEnrolledCourses] = useState<string[]>([]);
-
-  // ✅ FETCH COURSES
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const res = await fetch("/api/courses");
-        const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setCourses(data);
-        } else if (Array.isArray(data.courses)) {
-          setCourses(data.courses);
-        } else {
-          setCourses([]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch courses", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCourses();
-  }, []);
-
-  // ✅ ENROLL COURSE
-  const handleEnroll = async (course: Course) => {
+  const handleEnroll = async (courseId: string) => {
     try {
-      if (course.price === 0) {
-        const res = await fetch("/api/users/enroll", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseId: course._id }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          alert(data.error || "Enrollment failed");
-          return;
-        }
-
-        setEnrolledCourses((prev) => [...prev, course._id]);
-        alert("Successfully enrolled!");
-        return;
-      }
-
-      // Paid
-      const res = await fetch("/api/orders/create", {
+      const reponse = await fetch(`/api/course/enroll?courseId=${courseId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId: course._id }),
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
-      const data = await res.json();
+      const { message } = await reponse.json();
+      // const { data } = await reponse.json();
 
-      if (!res.ok) {
-        alert(data.error || "Order creation failed");
-        return;
-      }
+      // console.log(data);
 
-      router.push(`/checkout/${data.orderId}`);
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong");
+      toast.success(message);
+    } catch (error: any) {
+      toast.error("Error occured");
     }
   };
 
-  // ✅ FILTER COURSES
-  const filteredCourses = useMemo(() => {
-    let filtered = [...courses];
-
-    if (search) {
-      filtered = filtered.filter((course) =>
-        course.title.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    if (category !== "Category") {
-      filtered = filtered.filter((c) => c.category === category);
-    }
-
-    if (level !== "Sort by level") {
-      filtered = filtered.filter((c) => c.level === level);
-    }
-
-    if (sortBy === "az") {
-      filtered.sort((a, b) => a.title.localeCompare(b.title));
-    }
-
-    return filtered;
-  }, [courses, search, category, level, sortBy]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-lg">
-        Loading courses...
-      </div>
-    );
-  }
-
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const res = await fetch("/api/course/getCourses");
+        if (!res.ok) throw new Error("Failed to fetch courses");
+        const data = await res.json();
+        console.log(data);
+        setCourses(data.allcourses ?? data);
+      } catch (err: any) {
+        console.error(err.message);
+      }
+    };
+    fetchCourses();
+  }, []);
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      
-      {/* HEADER */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Courses</h1>
-        <p className="text-gray-600 mt-1">
-          Explore and enroll in courses
-        </p>
-      </div>
+    <div className="flex min-h-screen bg-white text-slate-900">
+      {/* Sidebar */}
 
-      {/* COURSES */}
-      <div className="grid md:grid-cols-3 gap-6">
-        {filteredCourses.map((course) => {
-          const isEnrolled = enrolledCourses.includes(course._id);
+      {/* Main Content */}
+      <main className="flex-1 px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Courses</h1>
+          <p className="text-slate-600 mt-1">
+            Explore the complete Computer Science curriculum
+          </p>
+        </div>
 
-          return (
+        {/* Filters */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <input
+            type="text"
+            placeholder="Search courses..."
+            className="w-full md:w-1/3 rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+
+          <select
+            className="rounded-lg border border-slate-300 px-4 py-2"
+            onChange={handleChange}
+            value={filter.category}
+          >
+            <option>All Levels</option>
+            <option>Beginner</option>
+            <option>Intermediate</option>
+            <option>Advanced</option>
+          </select>
+
+          <select
+            className="rounded-lg border border-slate-300 px-4 py-2"
+            onChange={handleChange}
+            value={filter.level}
+          >
+            <option>All Categories</option>
+            <option>Core CS</option>
+            <option>Systems</option>
+            <option>Web</option>
+            <option>AI</option>
+          </select>
+        </div>
+
+        {/* Courses Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {courses.map((course) => (
             <div
               key={course._id}
-              className="bg-white rounded-xl shadow hover:shadow-lg transition overflow-hidden"
+              className="rounded-xl border hover:cursor-pointer shadow:md border-slate-200 bg-white p-6 hover:shadow-md transition"
             >
-              <img
-                src={course.image || "/placeholder.jpg"}
-                alt={course.title}
-                className="h-48 w-full object-cover"
-              />
+              {/* 🔥 Report Button (TOP RIGHT) */}
+              <div className="absolute top-4 right-4"></div>
+              <span className="text-xs font-medium text-indigo-600">
+                {course.category}
+              </span>
 
-              <div className="p-5">
-                <h3 className="text-lg font-semibold mb-1">
-                  {course.title}
-                </h3>
+              <h2
+                className="text-xl font-semibold hover:underline mt-2"
+                onClick={() => {
+                  router.push(`/coursedesc/${course._id}`);
+                }}
+              >
+                {course.title}
+              </h2>
 
-                <p className="text-gray-500 text-sm mb-3">
-                  {course.instructor}
-                </p>
+              <p className="text-slate-600 text-sm mt-2">
+                {course.description}
+              </p>
 
-                <div className="flex justify-between text-sm text-gray-500 mb-2">
-                  <span>{course.lessons?.length || 0} lessons</span>
-                  <span>{course.level}</span>
+              <div className="flex items-center gap-4 text-sm text-slate-500 mt-4">
+                <div className="flex items-center gap-1">
+                  <BarChart3 size={16} />
+                  {course.level}
                 </div>
-
-                {!isEnrolled && (
-                  <p className="text-sm font-semibold mb-2 text-gray-700">
-                    {course.price === 0
-                      ? "Free Course"
-                      : `₹${course.price}`}
-                  </p>
-                )}
-
-                <div className="flex justify-between items-center mt-3">
-                  
-                  {isEnrolled ? (
-                    // ✅ FIXED BUTTON
-                    <button
-                      onClick={() => {
-                        if (course?._id) {
-                          console.log("Navigating to:", course._id);
-                          router.push(`/courses/${course._id}`);
-                        }
-                      }}
-                      className="bg-green-600 text-white px-4 py-1.5 rounded-lg text-sm"
-                    >
-                      Continue
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleEnroll(course)}
-                      className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 transition"
-                    >
-                      {course.price === 0
-                        ? "Enroll Free"
-                        : "Enroll Now"}
-                    </button>
-                  )}
-
+                <div className="flex items-center gap-1">
+                  <Clock size={16} />
+                  {course.duration}
+                </div>
+                <div className="flex items-center gap-1">
+                  <User size={16} />
+                  {course.enrolledStudents?.length || 0}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Star size={16} className="" />
+                  {course.rating}
                 </div>
               </div>
+
+              {/* Progress */}
+              {/* <div className="mt-5">
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span>Progress</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="w-full h-2 bg-slate-200 rounded-full">
+                  <div
+                    className="h-2 bg-indigo-600 rounded-full"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div> */}
+
+              <button
+                className="mt-6 w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition px-4 py-2 font-medium"
+                onClick={() => {
+                  router.push(`/courseplay?courseId=${course._id}`);
+                  handleEnroll(`${course._id}`);
+                }}
+              >
+                <BookOpen size={18} />
+                Enroll
+              </button>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { connect } from "@/dbConfig/dbConfig";
-import User from "@/models/userModel";
+import User from "@/models/users";
 import { NextResponse } from "next/server";
 connect();
 

@@ -1,195 +1,91 @@
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
-import Link from "next/link";
-import mongoose from "mongoose";
+"use client";
 
-import connectDB from "@/app/lib/mongodb";
-import UserProgress from "@/models/UserProgress";
-import Course from "@/models/Course";
-import StatCard from "@/app/components/courses/StatCard";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
-export default async function DashboardPage() {
-  
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-
-  if (!token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Please login to continue.
-      </div>
-    );
-  }
-
-  let decoded: any;
-
-  try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-  } catch {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Invalid session. Please login again.
-      </div>
-    );
-  }
-
-  await connectDB();
-
-  const userId = new mongoose.Types.ObjectId(decoded.id);
-
-  const progressData: any[] = await UserProgress.find({
-    user: userId,
-  }).lean();
-
-  const courseIds = progressData.map((p: any) => p.course);
-
-  let courses: any[] = [];
-
-  if (courseIds.length > 0) {
-    courses = await Course.find({
-      _id: { $in: courseIds },
-    }).lean();
-  }
-
-  const enrolledCoursesCount = courses.length;
-
-  let completedCoursesCount = 0;
-  let overallProgress = 0;
-
-  const courseProgressData = courses.map((course: any) => {
-    const progress = progressData.find(
-      (p: any) => p.course.toString() === course._id.toString()
-    );
-
-    const totalLessons = course.totalLessons || 0;
-
-    const completedLessons = Array.isArray(progress?.completedLessons)
-      ? progress.completedLessons.length
-      : 0;
-
-    const percent =
-      totalLessons > 0
-        ? Math.round((completedLessons / totalLessons) * 100)
-        : 0;
-
-    if (percent === 100) completedCoursesCount++;
-
-    overallProgress += percent;
-
-    return {
-      ...course,
-      percent,
-    };
-  });
-
-  if (enrolledCoursesCount > 0) {
-    overallProgress = Math.round(
-      overallProgress / enrolledCoursesCount
-    );
-  }
-
-  const continueLearning = courseProgressData
-    .filter((c) => c.percent < 100)
-    .sort((a, b) => b.percent - a.percent)[0];
+export default function UserDashboard() {
+  const courses = [
+    {
+      title: "React Bootcamp",
+      progress: 75,
+    },
+    {
+      title: "Node.js Mastery",
+      progress: 40,
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="max-w-7xl mx-auto px-6 py-10">
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold">Welcome back 👋</h1>
+        <p className="text-gray-500">Continue your learning journey</p>
+      </div>
 
-        {/* Header */}
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight">
-            Welcome,{" "}
-            <span className="text-blue-600">
-              {decoded.username || "Student"}
-            </span>{" "}
-            👋
-          </h1>
-          <p className="text-gray-500 mt-2">
-            Here’s your learning overview.
-          </p>
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="rounded-2xl">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-500">Enrolled Courses</p>
+            <h2 className="text-2xl font-semibold">12</h2>
+          </CardContent>
+        </Card>
 
-        {/* Stats Section */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-12">
-          <StatCard
-            title="Enrolled Courses"
-            value={enrolledCoursesCount.toString()}
-            bgColor="bg-blue-100"
-            textColor="text-blue-600"
-          />
-          <StatCard
-            title="Completed Courses"
-            value={completedCoursesCount.toString()}
-            bgColor="bg-green-100"
-            textColor="text-green-600"
-          />
-          <StatCard
-            title="Overall Progress"
-            value={`${overallProgress}%`}
-            bgColor="bg-purple-100"
-            textColor="text-purple-600"
-          />
-        </div>
+        <Card className="rounded-2xl">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-500">Completed</p>
+            <h2 className="text-2xl font-semibold">5</h2>
+          </CardContent>
+        </Card>
 
-        {/* Continue Learning */}
-        {continueLearning ? (
-          <section>
-            <h2 className="text-xl font-semibold mb-6">
-              Continue Learning
-            </h2>
+        <Card className="rounded-2xl">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-500">In Progress</p>
+            <h2 className="text-2xl font-semibold">7</h2>
+          </CardContent>
+        </Card>
+      </div>
 
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden md:flex">
+      {/* Continue Learning */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Continue Learning</h2>
 
-              <div className="md:w-1/3 h-64 bg-gray-200">
-                <img
-                  src={
-                    continueLearning.image ||
-                    "https://via.placeholder.com/600x400"
-                  }
-                  alt={continueLearning.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {courses.map((course, i) => (
+            <Card key={i} className="rounded-2xl">
+              <CardContent className="p-5 space-y-3">
+                <h3 className="font-medium">{course.title}</h3>
 
-              <div className="p-10 flex-1 flex flex-col justify-between">
                 <div>
-                  <h3 className="text-2xl font-semibold mb-4">
-                    {continueLearning.title}
-                  </h3>
-
-                  <div className="w-full bg-gray-200 h-3 rounded-full mb-4">
-                    <div
-                      className="bg-blue-600 h-3 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${continueLearning.percent}%`,
-                      }}
-                    />
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Progress</span>
+                    <span>{course.progress}%</span>
                   </div>
-
-                  <p className="text-gray-600">
-                    {continueLearning.percent}% completed
-                  </p>
+                  <Progress value={course.progress} />
                 </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
 
-                <Link
-                  href={`/course/${continueLearning._id}`}
-                  className="mt-6 inline-block bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:opacity-90 transition"
-                >
-                  Resume Course
-                </Link>
-              </div>
+      {/* Recommended */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Recommended for you</h2>
 
-            </div>
-          </section>
-        ) : (
-          <div className="bg-white p-10 rounded-xl text-center shadow-sm">
-            <p className="text-gray-500">
-              You are not enrolled in any courses yet.
-            </p>
-          </div>
-        )}
-
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((_, i) => (
+            <Card key={i} className="rounded-2xl">
+              <CardContent className="p-5">
+                <h3 className="font-medium">Course Title {i + 1}</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Short description of the course
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
