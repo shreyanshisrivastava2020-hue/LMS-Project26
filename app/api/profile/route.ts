@@ -1,16 +1,14 @@
-// app/api/enroll/route.ts
-
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import connectDB from "@/lib/db";
+import User from "@/models/users";
 import Enrollment from "@/models/Enrollment";
+import "@/models/Course"; // ✅ FIX
 
-export async function POST(req: Request) {
+export async function GET() {
   try {
     await connectDB();
-
-    const { courseId } = await req.json();
 
     const token = (await cookies()).get("token")?.value;
 
@@ -23,24 +21,20 @@ export async function POST(req: Request) {
 
     const userId = (payload as any).id;
 
-    // prevent duplicate enroll
-    const exists = await Enrollment.findOne({ userId, courseId });
+    const user = await User.findById(userId).select("-password");
 
-    if (exists) {
-      return NextResponse.json({ message: "Already enrolled" });
-    }
+    const enrollments = await Enrollment.find({ userId })
+      .populate("courseId");
 
-    // create enrollment
-    await Enrollment.create({
-      userId,
-      courseId,
-      progress: 0,
-    });
+    const courses = enrollments.map((e: any) => ({
+      title: e.courseId?.title || "Untitled",
+      progress: e.progress || 0,
+    }));
 
-    return NextResponse.json({ message: "Enrolled successfully" });
+    return NextResponse.json({ user, courses });
 
   } catch (error) {
     console.log(error);
-    return NextResponse.json({ error: "Error enrolling" });
+    return NextResponse.json({ error: "Server error" });
   }
 }

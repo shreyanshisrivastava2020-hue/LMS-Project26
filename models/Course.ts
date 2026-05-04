@@ -1,30 +1,34 @@
+
 import mongoose, { Document } from "mongoose";
 
+export interface ILesson {
+  title: string;
+  description: string;
+  url: string;
+  type: "video" | "quiz" | "assignment";
+  duration: number;
+  isPreview: boolean;
+}
+
+export interface IModule {
+  title: string;
+  description: string;
+  lessons: ILesson[];
+}
+
 export interface ICourse extends Document {
-  title: String;
-  description: String;
+  title: string;
+  description: string;
   thumbnail: {
-    url: String;
-    public_id: String;
+    url: string;
+    public_id: string;
   };
   price: number;
-  category: String;
+  category: string;
   level: "Beginner" | "Intermediate" | "Advanced";
-  duration: String;
+  duration: string;
   instructor: mongoose.Schema.Types.ObjectId;
-  modules: {
-    title: String;
-    description: String;
-    lesson: {
-      title: String;
-      description: String;
-      url: String;
-      completed: boolean;
-      type: String;
-      duration: number;
-      isPreview: boolean;
-    }[];
-  }[];
+  modules: IModule[];
   enrolledStudents: mongoose.Schema.Types.ObjectId[];
   rating: number;
   totalReviews: number;
@@ -35,10 +39,6 @@ const lessonSchema = new mongoose.Schema({
   title: String,
   description: String,
   url: String,
-  completed: {
-    type: Boolean,
-    default: false,
-  },
   type: {
     type: String,
     enum: ["video", "quiz", "assignment"],
@@ -59,53 +59,45 @@ const moduleSchema = new mongoose.Schema({
 
 const courseSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
-      required: true,
-    },
+    title: { type: String, required: true },
     description: String,
+
     thumbnail: {
       url: String,
       public_id: String,
     },
-    price: {
-      type: Number,
-      default: 0,
-    },
-    category: {
-      type: String,
-    },
+
+    price: { type: Number, default: 0 },
+    category: String,
+
     level: {
       type: String,
       enum: ["Beginner", "Intermediate", "Advanced"],
     },
+
     duration: String,
+
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+
     modules: [moduleSchema],
+
     enrolledStudents: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-    rating: {
-      type: Number,
-      default: 0,
-    },
-    totalReviews: {
-      type: Number,
-      default: 0,
-    },
-    isPublished: {
-      type: Boolean,
-      default: false,
-    },
+
+    rating: { type: Number, default: 0 },
+    totalReviews: { type: Number, default: 0 },
+
+    isPublished: { type: Boolean, default: false },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 export default mongoose.models.Course ||

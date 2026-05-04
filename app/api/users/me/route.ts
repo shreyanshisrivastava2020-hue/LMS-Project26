@@ -1,67 +1,59 @@
-import { connect } from "@/dbConfig/dbConfig";
-import User from "@/models/users";
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getDataFromToken } from "@/helpers/getDataFromToken";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
+import connectDB from "@/lib/db";
+import User from "@/models/users";
 
-connect();
-export async function POST(request: NextRequest) {
-  const userId = await getDataFromToken(request);
-  const user = await User.findOne({ _id: userId }).select("-password");
-  if (!user) {
-    return NextResponse.json({ message: "User not found" }, { status: 404 });
-  }
-  if (user.role === "instructor") {
-    await user.populate(
-      "createdCourses",
-      "title description price level category rating thumbnail enrolledStudents",
-    );
-    return NextResponse.json({ message: "Instructor Found", data: user });
-  }
-  if (user.role === "student") {
-    await user.populate("enrolledCourses", "title description price");
-    return NextResponse.json({ message: "Student Found", data: user });
-  }
-  return NextResponse.json({ message: "User Found", data: user });
-}
-
-export async function PATCH(request: NextRequest) {
+export async function GET() {
   try {
-    const userId = await getDataFromToken(request);
-    const body = await request.json();
+    await connectDB();
 
-    const updateFields: Record<string, any> = {};
-    if (body.name !== undefined) updateFields.name = body.name;
-    if (body.email !== undefined) updateFields.email = body.email;
+    // ✅ Get token
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
 
-    if (Object.keys(updateFields).length === 0) {
+    if (!token) {
       return NextResponse.json(
-        { message: "No valid fields provided for update" },
-        { status: 400 },
+        { message: "Unauthorized - No token" },
+        { status: 401 }
       );
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: updateFields },
-      { new: true, select: "-password" },
-    );
+    // ✅ SAFE VERIFY (VERY IMPORTANT)
+    let decoded: any;
 
-    if (!updatedUser) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET as string
+      );
+    } catch (err) {
+      return NextResponse.json(
+        { message: "Invalid or expired token" },
+        { status: 401 }
+      );
     }
 
-    return NextResponse.json({
-      message: "User updated successfully",
-      data: updatedUser,
-    });
+    // ✅ Fetch user
+    const user = await User.findById(decoded.id).select("-password");
+
+    if (!user) {
+      return NextResponse.json(
+        { message: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(user);
+
   } catch (error: any) {
+    console.error("ME API ERROR:", error);
+
     return NextResponse.json(
-      {
-        message: "Error updating user",
-        error: error.message ?? "Unknown error",
-      },
-      { status: 500 },
+      { message: "Server error" },
+      { status: 500 }
     );
   }
 }

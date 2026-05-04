@@ -8,49 +8,64 @@ import { useParams } from "next/navigation";
 export default function CoursePage() {
   const [openModule, setOpenModule] = useState<number | null>(null);
   const [course, setCourse] = useState<any>(null);
+  const [error, setError] = useState(false);
 
   const params = useParams();
+  const cid = params?.cid as string;
 
-  // ✅ Fetch course
   useEffect(() => {
+    if (!cid) return;
+
     const fetchCourse = async () => {
       try {
-        const res = await fetch(`/api/course/${params.cid}`);
-
+        const res = await fetch(`/api/course/${cid}`);
         const data = await res.json();
 
-        console.log("frontend:", params);
-
         if (!res.ok) {
-          console.log(data.message);
+          setError(true);
           return;
         }
 
-        setCourse(data.data);
+        // 🔥 works for both formats
+        setCourse(data.data || data);
       } catch (err) {
-        console.error("Error fetching course:", err);
+        console.error(err);
+        setError(true);
       }
     };
 
-    if (params?.cid) fetchCourse();
-  }, [params?.cid]);
+    fetchCourse();
+  }, [cid]);
 
-  // ✅ Loading state
-  if (!course) {
-    return <div className="p-10 text-center">Loading course...</div>;
+  if (error) {
+    return (
+      <div className="p-10 text-center text-red-500">
+        Course not found
+      </div>
+    );
   }
 
-  // ✅ Calculate total duration
-  const totalMinutes = course.modules.reduce(
+  if (!course) {
+    return (
+      <div className="p-10 text-center">
+        Loading course...
+      </div>
+    );
+  }
+
+  const modules = course.modules || [];
+
+  const totalMinutes = modules.reduce(
     (acc: number, mod: any) =>
-      acc + mod.lessons.reduce((a: number, l: any) => a + l.duration, 0),
-    0,
+      acc + (mod.lessons || []).reduce((a: number, l: any) => a + l.duration, 0),
+    0
   );
 
   const totalHours = (totalMinutes / 60).toFixed(1);
 
   return (
     <div className="min-h-screen bg-slate-100">
+
       {/* HERO */}
       <div className="relative h-72 w-full">
         <Image
@@ -62,7 +77,9 @@ export default function CoursePage() {
 
         <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-center">
           <div className="max-w-3xl px-6 text-white">
-            <h1 className="text-3xl md:text-5xl font-bold">{course.title}</h1>
+            <h1 className="text-3xl md:text-5xl font-bold">
+              {course.title}
+            </h1>
 
             <p className="mt-4 text-gray-200">
               Created by{" "}
@@ -80,18 +97,21 @@ export default function CoursePage() {
 
       {/* CONTENT */}
       <div className="max-w-5xl mx-auto px-6 py-10">
-        {/* Description */}
+
         <div className="bg-white rounded-xl border p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-2">About this course</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            About this course
+          </h2>
           <p className="text-slate-600">{course.description}</p>
         </div>
 
-        {/* Modules */}
         <div className="space-y-6">
-          {course.modules.map((mod: any, i: number) => {
-            const moduleMinutes = mod.lessons.reduce(
+          {modules.map((mod: any, i: number) => {
+            const lessons = mod.lessons || [];
+
+            const moduleMinutes = lessons.reduce(
               (a: number, l: any) => a + l.duration,
-              0,
+              0
             );
 
             return (
@@ -100,16 +120,19 @@ export default function CoursePage() {
                   {i + 1}. {mod.title}
                 </h3>
 
-                <p className="text-sm text-slate-600 mb-3">{mod.desc}</p>
+                <p className="text-sm text-slate-600 mb-3">
+                  {mod.desc}
+                </p>
 
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full">
-                    {mod.lessons.length} Lessons •{" "}
-                    {(moduleMinutes / 60).toFixed(1)} hrs
+                    {lessons.length} Lessons • {(moduleMinutes / 60).toFixed(1)} hrs
                   </span>
 
                   <button
-                    onClick={() => setOpenModule(openModule === i ? null : i)}
+                    onClick={() =>
+                      setOpenModule(openModule === i ? null : i)
+                    }
                     className="text-sm text-indigo-600 hover:underline"
                   >
                     {openModule === i ? "Hide Details" : "View Details"}
@@ -118,7 +141,7 @@ export default function CoursePage() {
 
                 {openModule === i && (
                   <div className="mt-4 border-t pt-4 space-y-2">
-                    {mod.lessons.map((lesson: any, idx: number) => (
+                    {lessons.map((lesson: any, idx: number) => (
                       <div
                         key={idx}
                         className="flex justify-between bg-slate-50 px-4 py-2 rounded-lg"
