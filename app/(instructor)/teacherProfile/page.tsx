@@ -4,7 +4,7 @@ import { Github, Linkedin, Globe, BookOpen, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function InstructorProfile() {
-  // ✅ FIXED TYPES
+  //  FIXED TYPES
   const [instructor, setInstructor] = useState<{
     name: string;
     profileImage: string;
@@ -31,7 +31,7 @@ export default function InstructorProfile() {
     },
   });
 
-  // ✅ EDIT STATES
+  //  EDIT STATES
   const [isEditing, setIsEditing] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -62,7 +62,7 @@ export default function InstructorProfile() {
             ? data.profileImage
             : "https://images.unsplash.com/photo-1607746882042-944635dfe10e",
           bio: data.bio,
-          expertise: data.expertise || [], // ✅ SAFE
+          expertise: data.expertise || [], // SAFE
           experience: data.experience,
           createdCourses: data.createdCourses || [],
           socialLinks: data.socialLinks || {
@@ -72,7 +72,7 @@ export default function InstructorProfile() {
           },
         });
 
-        // ✅ SYNC FORM
+        //  SYNC FORM
         setFormData({
           name: data.name || "",
           bio: data.bio || "",
@@ -90,7 +90,7 @@ export default function InstructorProfile() {
     fetchInstructor();
   }, []);
 
-  // ✅ SAVE FUNCTION
+  //  SAVE FUNCTION
   const handleSave = () => {
     setInstructor({
       ...instructor,
@@ -118,7 +118,7 @@ export default function InstructorProfile() {
       <div className="max-w-6xl mx-auto px-6">
         {/* Profile Card */}
         <div className="bg-white rounded-2xl shadow-lg p-8 -mt-20 relative">
-          {/* ✅ EDIT BUTTON */}
+          {/* EDIT BUTTON */}
           <button
             onClick={() => setIsEditing(true)}
             className="absolute top-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700"
@@ -255,7 +255,7 @@ export default function InstructorProfile() {
         </div>
       </div>
 
-      {/* ✅ EDIT MODAL */}
+      {/* EDIT MODAL */}
       {isEditing && (
         <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-xl w-125 space-y-4">

@@ -46,7 +46,7 @@ const userSchema: Schema = new Schema(
     role: {
       type: String,
       enum: ["student", "instructor", "admin"],
-      default: "student",
+      required: true,
     },
 
     bio: String,

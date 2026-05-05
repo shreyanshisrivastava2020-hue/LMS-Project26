@@ -13,6 +13,7 @@ const SignupPage = () => {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "", // ✅ added
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -24,6 +25,7 @@ const SignupPage = () => {
     email?: string;
     password?: string;
     confirmPassword?: string;
+    role?: string;
     apiError?: string;
   }>({});
 
@@ -52,8 +54,15 @@ const SignupPage = () => {
     return "";
   };
 
-  // ✅ Handle Change (Real-time Validation + Clear API error)
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateRole = (value: string) => {
+    if (!value) return "Please select a role";
+    return "";
+  };
+
+  // ✅ Handle Change
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
 
     setFormData((prev) => ({
@@ -70,7 +79,9 @@ const SignupPage = () => {
             ? validateEmail(value)
             : name === "password"
               ? validatePassword(value)
-              : validateConfirmPassword(value),
+              : name === "confirmPassword"
+                ? validateConfirmPassword(value)
+                : validateRole(value),
       apiError: undefined,
     }));
   };
@@ -83,13 +94,15 @@ const SignupPage = () => {
     const emailError = validateEmail(formData.email);
     const passwordError = validatePassword(formData.password);
     const confirmError = validateConfirmPassword(formData.confirmPassword);
+    const roleError = validateRole(formData.role);
 
-    if (nameError || emailError || passwordError || confirmError) {
+    if (nameError || emailError || passwordError || confirmError || roleError) {
       setErrors({
         name: nameError,
         email: emailError,
         password: passwordError,
         confirmPassword: confirmError,
+        role: roleError,
       });
       return;
     }
@@ -110,10 +123,11 @@ const SignupPage = () => {
 
       if (!res.ok) {
         setErrors({
-          apiError: data.message || "Signup failed",
+          apiError: data.error || "Signup failed",
         });
         return;
       }
+
       router.push("/login");
     } catch (error) {
       setErrors({
@@ -137,19 +151,18 @@ const SignupPage = () => {
             <label className="block text-sm font-medium mb-1">Username</label>
             <input
               type="text"
-              id="name"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none ${
+              className={`w-full px-3 py-2 border rounded-md ${
                 errors.name
-                  ? "border-red-500 focus:ring-2 focus:ring-red-300"
+                  ? "border-red-500"
                   : "border-gray-300 focus:ring-2 focus:ring-blue-300"
               }`}
               placeholder="Enter your username"
             />
             {errors.name && (
-              <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+              <p className="text-red-500 text-sm">{errors.name}</p>
             )}
           </div>
 
@@ -161,15 +174,39 @@ const SignupPage = () => {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none ${
+              className={`w-full px-3 py-2 border rounded-md ${
                 errors.email
-                  ? "border-red-500 focus:ring-2 focus:ring-red-300"
+                  ? "border-red-500"
                   : "border-gray-300 focus:ring-2 focus:ring-blue-300"
               }`}
               placeholder="Enter your email"
             />
             {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+              <p className="text-red-500 text-sm">{errors.email}</p>
+            )}
+          </div>
+
+          {/* Role */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Role</label>
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className={`w-full px-3 py-2 border rounded-md ${
+                errors.role
+                  ? "border-red-500"
+                  : "border-gray-300 focus:ring-2 focus:ring-blue-300"
+              }`}
+            >
+              <option value="">Select Role</option>
+              <option value="student">Student</option>
+              <option value="instructor">Instructor</option>
+              <option value="admin">Admin</option>
+            </select>
+
+            {errors.role && (
+              <p className="text-red-500 text-sm">{errors.role}</p>
             )}
           </div>
 
@@ -181,9 +218,9 @@ const SignupPage = () => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md pr-10 focus:outline-none ${
+              className={`w-full px-3 py-2 border rounded-md pr-10 ${
                 errors.password
-                  ? "border-red-500 focus:ring-2 focus:ring-red-300"
+                  ? "border-red-500"
                   : "border-gray-300 focus:ring-2 focus:ring-blue-300"
               }`}
               placeholder="Enter your password"
@@ -191,12 +228,12 @@ const SignupPage = () => {
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-9 text-gray-500"
+              className="absolute right-3 top-9"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+              <p className="text-red-500 text-sm">{errors.password}</p>
             )}
           </div>
 
@@ -210,22 +247,24 @@ const SignupPage = () => {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md pr-10 focus:outline-none ${
+              className={`w-full px-3 py-2 border rounded-md pr-10 ${
                 errors.confirmPassword
-                  ? "border-red-500 focus:ring-2 focus:ring-red-300"
+                  ? "border-red-500"
                   : "border-gray-300 focus:ring-2 focus:ring-blue-300"
               }`}
               placeholder="Confirm your password"
             />
             <button
               type="button"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              className="absolute right-3 top-9 text-gray-500"
+              onClick={() =>
+                setShowConfirmPassword((prev) => !prev)
+              }
+              className="absolute right-3 top-9"
             >
               {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
             {errors.confirmPassword && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-red-500 text-sm">
                 {errors.confirmPassword}
               </p>
             )}
@@ -239,16 +278,16 @@ const SignupPage = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition disabled:opacity-50"
+            className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             {loading ? "Creating Account..." : "Sign Up"}
           </button>
         </form>
 
-        <p className="mt-6 text-sm text-gray-600 text-center">
+        <p className="mt-4 text-center text-sm">
           Already have an account?{" "}
-          <Link href="/login" className="text-blue-600 hover:underline">
-            Log in
+          <Link href="/login" className="text-blue-600">
+            Login
           </Link>
         </p>
       </div>
